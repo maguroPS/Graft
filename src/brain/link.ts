@@ -14,8 +14,6 @@
  */
 import { readBuildConfig, patchBuildConfig, cacheDir, readJson, writeJsonAtomic } from '../util/state.js';
 import { join } from 'node:path';
-import { ensureGitignored, LINK_NOTE } from '../context/node-file.js';
-import { BUILD_CONFIG_DIR } from '../util/state.js';
 
 /** Default API host. Overridden by GRAFT_BRAIN_URL, for staging and self-hosted. */
 const DEFAULT_BRAIN_BASE_URL = 'https://agents.nanonets.com';
@@ -95,7 +93,6 @@ export function readLink(dir: string): BrainLink | null {
  * therefore one `git add -A` away from publishing a credential. */
 export function writeLink(dir: string, link: BrainLink): void {
   patchBuildConfig(dir, { brain: link });
-  ensureGitignored(dir, join(dir, BUILD_CONFIG_DIR), LINK_NOTE);
 }
 
 /** Forget the link for repo `dir`. Leaves the cached rules for `uninstall` to remove. */
@@ -170,7 +167,6 @@ export function readPendingSignup(dir: string, repo: string, maxAgeMs: number, n
  * because the state claims a read token. */
 export function writePendingSignup(dir: string, pending: PendingSignup): void {
   patchBuildConfig(dir, { pendingSignup: pending });
-  ensureGitignored(dir, join(dir, BUILD_CONFIG_DIR), LINK_NOTE);
 }
 
 export function clearPendingSignup(dir: string): void {
