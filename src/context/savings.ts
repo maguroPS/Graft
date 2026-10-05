@@ -27,13 +27,15 @@ export function toTokens(chars: number): number {
   return Math.round(chars / 4);
 }
 
-/** path → char size, from the file nodes the build sized. Skips nodes with no
- * `chars` (pre-upgrade graphs), so an old index just yields a smaller baseline
- * rather than a wrong one. */
+/** path → char size, from the source-file and Markdown-document nodes the build
+ * sized. Section nodes deliberately do not participate: their text is already
+ * part of the enclosing document, so including them would double-count a
+ * Markdown file. Skips nodes with no `chars` (pre-upgrade graphs), so an old
+ * index just yields a smaller baseline rather than a wrong one. */
 function fileSizes(graph: GraphV1): Map<string, number> {
   const m = new Map<string, number>();
   for (const n of graph.nodes)
-    if (n.kind === 'file' && typeof n.chars === 'number') m.set(n.path, n.chars);
+    if ((n.kind === 'file' || n.kind === 'document') && typeof n.chars === 'number') m.set(n.path, n.chars);
   return m;
 }
 
