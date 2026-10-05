@@ -73,10 +73,12 @@ test('every event carries the common properties, and no identifier beyond them',
   assert.match(ev.distinct_id, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
 });
 
-test('the contract lists exactly the seven documented events', () => {
+// Pinned rather than counted, so adding an event is a deliberate edit here and
+// a matching row in TELEMETRY.md, never something that arrives with a feature.
+test('the contract lists exactly the ten documented events', () => {
   assert.deepEqual(Object.keys(EVENTS).sort(), [
-    'build_completed', 'build_failed', 'first_run', 'init_completed', 'install', 'query',
-    'session_summary',
+    'brain_signup_opened', 'brain_signup_settled', 'build_completed', 'build_failed',
+    'first_run', 'init_completed', 'install', 'query', 'session_summary', 'trail_pulled',
   ]);
 });
 
@@ -169,4 +171,58 @@ test('langsValue drops anything that is not a plain language token', () => {
   assert.equal(langsValue(['ts', 'my repo']), 'ts', 'a space is not a language token');
   // Real language labels survive, including the awkward ones.
   assert.equal(langsValue(['c++', 'c#', 'objective-c', 'f#']), 'c#,c++,f#,objective-c');
+});
+
+// --- the brain signup handoff ---
+
+// The push handoff is the one flow that spans both products, and the outcome is
+// the half that can vanish: a user who reads the URL and walks away kills the
+// process. Only an event already queued survives that, which is why `opened` is
+// the denominator and `settled` is not.
+test('brain signup: the outcome is a category, never the sentence the user saw', () => {
+  const home = sandbox('tel-brain-signup-outcome');
+  const ev = track(
+    'brain_signup_settled',
+    {
+      outcome: 'timed_out',
+      duration_bucket: durationBucket(5 * 60 * 1000),
+      error: 'timed out waiting for the browser — run `graft trail push` again',
+    },
+    { home, env: OPEN },
+  );
+  assert.equal(ev?.properties.outcome, 'timed_out');
+  assert.equal(ev?.properties.duration_bucket, '2-10m');
+  // The printed sentence names the repo and the link, so it must not ride along
+  // even when a call site passes it.
+  assert.equal(ev?.properties.error, undefined);
+});
+
+test('brain signup: opened carries only whether an agent ran it', () => {
+  const home = sandbox('tel-brain-signup-opened');
+  const ev = track('brain_signup_opened', { mode: 'agent', repo: 'acme/app', port: '51234' }, { home, env: OPEN });
+  assert.ok(ev);
+  assert.equal(ev.properties.mode, 'agent');
+  assert.equal(ev.properties.repo, undefined);
+  assert.equal(ev.properties.port, undefined);
+});
+
+test('brain signup: both events are in the contract', () => {
+  assert.ok(EVENTS.brain_signup_opened);
+  assert.ok(EVENTS.brain_signup_settled);
+});
+
+// --- trail pull ---
+
+test('trail pull: counts travel as buckets, and a path never rides along', () => {
+  const home = sandbox('tel-trail-pulled');
+  const ev = track(
+    'trail_pulled',
+    { outcome: 'written', kinds: 'agents_md,claude_md', files_bucket: '1-4', changes_bucket: '5-19', skipped_bucket: '0', suggested_bucket: '20-49', path: 'web/CLAUDE.md' },
+    { home, env: OPEN },
+  );
+  assert.equal(ev?.properties.outcome, 'written');
+  assert.equal(ev?.properties.kinds, 'agents_md,claude_md');
+  assert.equal(ev?.properties.changes_bucket, '5-19');
+  assert.equal(ev?.properties.suggested_bucket, '20-49');
+  assert.equal(ev?.properties.path, undefined);
 });

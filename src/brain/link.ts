@@ -60,7 +60,7 @@ export interface RulesCache {
 /** The persisted brain link. */
 export interface BrainLink {
   brainId: string;
-  /** Workspace API key (`nn...`). Stored in the git-ignored `.graft/`. */
+  /** Workspace API key (`nn...`). Stored in the git-ignored `.graft.json`. */
   token: string;
   /** Set only when the user pointed graft at a non-default host. */
   baseUrl?: string;
@@ -83,7 +83,7 @@ export function readLink(dir: string): BrainLink | null {
   return stored;
 }
 
-/** Persist the link for repo `dir`, merging into any existing build config. */
+/** Persist the link for repo `dir`, merging into the git-ignored build config. */
 export function writeLink(dir: string, link: BrainLink): void {
   patchBuildConfig(dir, { brain: link });
 }
@@ -132,6 +132,38 @@ export function markRulesChecked(dir: string, now = Date.now()): void {
  */
 export function baseUrlFor(link: BrainLink): string {
   return (process.env.GRAFT_BRAIN_URL || link.baseUrl || DEFAULT_BRAIN_BASE_URL).replace(/\/+$/, '');
+}
+
+/** The API host before there is a link to read one from: signing up. */
+export function apiBaseUrl(): string {
+  return (process.env.GRAFT_BRAIN_URL || DEFAULT_BRAIN_BASE_URL).replace(/\/+$/, '');
+}
+
+/** A sign-up an agent-run push started and has not collected yet. */
+export interface PendingSignup {
+  /** The state in the link, which is what claims the trail. */
+  state: string;
+  /** The repository the link was for, so a changed remote starts over. */
+  repo: string;
+  createdAt: number;
+}
+
+/** The sign-up waiting on repo `dir`, or null when there is none or it is too
+ * old to claim, or it was for a different repository. */
+export function readPendingSignup(dir: string, repo: string, maxAgeMs: number, now = Date.now()): PendingSignup | null {
+  const p = readBuildConfig(dir)?.pendingSignup;
+  if (!p?.state || p.repo !== repo || !(now - p.createdAt < maxAgeMs)) return null;
+  return p;
+}
+
+/** Save the sign-up an agent-run push just started. Git-ignored like the link,
+ * because the state claims a read token. */
+export function writePendingSignup(dir: string, pending: PendingSignup): void {
+  patchBuildConfig(dir, { pendingSignup: pending });
+}
+
+export function clearPendingSignup(dir: string): void {
+  patchBuildConfig(dir, { pendingSignup: undefined });
 }
 
 /** Timeout for one rules fetch. Short: `ask` must never block on this. */
