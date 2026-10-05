@@ -26,6 +26,15 @@ function fileNode(path: string, chars?: number): NodeV1 {
   };
 }
 
+function documentNode(path: string, chars?: number): NodeV1 {
+  return {
+    ...fileNode(path, chars),
+    id: `${path}#document`,
+    kind: 'document',
+    origin: 'markdown',
+  };
+}
+
 function graphOf(nodes: NodeV1[]): GraphV1 {
   return { meta: { version: 1, nodeCount: nodes.length, edgeCount: 0, languages: [] }, nodes, edges: [] };
 }
@@ -33,6 +42,12 @@ function graphOf(nodes: NodeV1[]): GraphV1 {
 test('savingsFor: sums the sizes of the distinct baseline files', () => {
   const g = graphOf([fileNode('a.ts', 400), fileNode('b.ts', 600)]);
   const s = savingsFor(g, ['a.ts', 'b.ts', 'a.ts']); // duplicate a.ts counted once
+  assert.deepEqual(s, { files: 2, baselineChars: 1000 });
+});
+
+test('savingsFor: includes indexed Markdown documents once per path', () => {
+  const g = graphOf([fileNode('src/a.ts', 400), documentNode('docs/guide.md', 600)]);
+  const s = savingsFor(g, ['src/a.ts', 'docs/guide.md', 'docs/guide.md']);
   assert.deepEqual(s, { files: 2, baselineChars: 1000 });
 });
 
