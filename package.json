@@ -1,5 +1,5 @@
 {
-  "name": "@nanonets/graft",
+  "name": "@magurops/graft",
   "version": "0.21.1",
   "description": "Build a repo's context graph as a folder of linked markdown files: a local, regenerable cache that every query keeps in sync with your code.",
   "keywords": [
@@ -14,14 +14,14 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NanoNets/context-graph-engine.git"
+    "url": "git+https://github.com/maguroPS/Graft.git"
   },
-  "homepage": "https://github.com/NanoNets/context-graph-engine#readme",
+  "homepage": "https://github.com/maguroPS/Graft#readme",
   "bugs": {
-    "url": "https://github.com/NanoNets/context-graph-engine/issues"
+    "url": "https://github.com/maguroPS/Graft/issues"
   },
   "publishConfig": {
-    "access": "public"
+    "registry": "https://npm.pkg.github.com"
   },
   "type": "module",
   "main": "./dist/index.js",
