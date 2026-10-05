@@ -36,6 +36,7 @@ export interface WorkspaceBuildOptions {
    * independent repos with their own local settings and can later be rebuilt
    * directly without seeing the parent invocation's flags. */
   includeDirs?: string[];
+  docsDirs?: string[];
   /** An explicit CLI submodule choice to persist into every child repo. */
   followSubmodules?: boolean;
   /** An explicit CLI nested-clone choice to persist into every child repo. */
@@ -52,6 +53,9 @@ export async function runWorkspaceBuild(root: string, opts: WorkspaceBuildOption
     const childConfigPatch: BuildConfig = {};
     if (opts.includeDirs && opts.includeDirs.length > 0) {
       childConfigPatch.includeDirs = opts.includeDirs;
+    }
+    if (opts.docsDirs && opts.docsDirs.length > 0) {
+      childConfigPatch.docsDirs = opts.docsDirs;
     }
     if (opts.followSubmodules !== undefined) {
       childConfigPatch.followSubmodules = opts.followSubmodules;
@@ -100,9 +104,9 @@ export function runWorkspaceGrep(
   root: string,
   override: string | undefined,
   pattern: string,
-  opts: { ignoreCase?: boolean; fixed?: boolean; json?: boolean },
+  opts: { ignoreCase?: boolean; fixed?: boolean; docs?: boolean; json?: boolean },
 ): void {
-  const { result, coverage } = federateGrep(root, override, pattern, { ignoreCase: opts.ignoreCase, fixed: opts.fixed });
+  const { result, coverage } = federateGrep(root, override, pattern, { ignoreCase: opts.ignoreCase, fixed: opts.fixed, docs: opts.docs });
   if (opts.json) {
     console.log(JSON.stringify(result, null, 2));
     return;

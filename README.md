@@ -369,6 +369,7 @@ graft callers <symbol> -d N          # walk transitively out to depth N — full
 graft grep "<regex>" [dir]           # exhaustive regex search over indexed files, grouped by enclosing symbol (no LLM, no key)
 graft grep "<regex>" --in <path>     # narrow to files at or under this path prefix
 graft grep "<regex>" -i --fixed      # case-insensitive; treat the pattern as a literal string, not a regex
+graft build --no-docs                 # build a code-only graph (Markdown is indexed by default)
 
 graft map [dir]                      # token-budgeted repo orientation — dir clusters, hubs, hotspots (no LLM, no key)
 graft map --max-dirs N               # raise/lower the number of directories shown
@@ -425,7 +426,8 @@ type on method-heavy code, not every method anywhere with that name.
 
 ## Search & orient (`graft grep` / `graft map`)
 
-`graft grep "<regex>"` is exhaustive over every indexed file and groups hits
+`graft grep "<regex>"` is exhaustive over every indexed code file and configured
+Markdown document, and groups hits
 by enclosing symbol, ranked by the same in-edge coupling `graft map` uses —
 built for "every occurrence of this pattern" tasks where `graft ask`'s
 ranked top-N isn't enough:
@@ -471,10 +473,10 @@ Graft supports these layouts:
   `deps/parser/src/index.ts`) while honoring each submodule's own Git ignore
   rules. Visible untracked files are included too; uninitialized submodules
   remain absent until `git submodule update --init` checks them out. The choice
-  is saved in `.graft/config.json`, so later no-flag builds and MCP automatic
+  is saved in `.graft.json`, so later no-flag builds and MCP automatic
   refreshes behave the same way. Run `graft build --no-follow-submodules` to
   restore and persist the default boundary.
-- **A git repo with other repos cloned inside it** (no gitlink, no index entry) — the shape multi-repo manifest tools like `west`, `repo`, `gclient` and `tsrc` check dependencies out into, and the shape you get by cloning an upstream into the tree to patch it locally. `--follow-submodules` cannot reach these: they have no `160000` index entry to follow. Run `graft build --follow-nested-repos` to fold them into one graph, prefixing child paths (for example, `external/parser/src/index.ts`) while honoring each clone's own Git ignore rules. A clone at a git-ignored path stays absent, since Git never reports it. The choice is saved in `.graft/config.json` and is independent of `--follow-submodules` — neither flag implies the other. Run `graft build --no-follow-nested-repos` to restore and persist the default boundary. Prefer this over the multi-repo split below when the nested repos import from each other and you want those edges in one graph; prefer the split when you want each repo scored and refreshed on its own.
+- **A git repo with other repos cloned inside it** (no gitlink, no index entry) — the shape multi-repo manifest tools like `west`, `repo`, `gclient` and `tsrc` check dependencies out into, and the shape you get by cloning an upstream into the tree to patch it locally. `--follow-submodules` cannot reach these: they have no `160000` index entry to follow. Run `graft build --follow-nested-repos` to fold them into one graph, prefixing child paths (for example, `external/parser/src/index.ts`) while honoring each clone's own Git ignore rules. A clone at a git-ignored path stays absent, since Git never reports it. The choice is saved in `.graft.json` and is independent of `--follow-submodules` — neither flag implies the other. Run `graft build --no-follow-nested-repos` to restore and persist the default boundary. Prefer this over the multi-repo split below when the nested repos import from each other and you want those edges in one graph; prefer the split when you want each repo scored and refreshed on its own.
 - **A folder of separate git repos** (no `.git` at the top) — `graft build`
   auto-splits: each child gets its own (git-ignored) `graft/`, and the parent
   gets a `graft/workspace.json` index. Queries from the parent federate across

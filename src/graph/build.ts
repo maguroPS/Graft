@@ -32,7 +32,8 @@ import {
 } from "./extract-cache.js";
 import { writeFingerprint } from "./fingerprint.js";
 import { seedGraph, type SeedResult } from "./seed.js";
-import { filterByOnlyDirs, listSourceStats } from "./source-files.js";
+import { filterByOnlyDirs, listDocFiles, listIndexedStats } from "./source-files.js";
+import { extractMarkdown, resolveMarkdownEdges, type MarkdownRef } from "./markdown.js";
 import { resolveEdges, type GoModule } from "./resolve.js";
 import { enrichGraph, type EnrichStats } from "./enrich.js";
 import { readGraph, writeGraph, wiringPath } from "./write.js";
@@ -163,11 +164,13 @@ export async function buildGraph(
   });
   const onlyDirs = opts.onlyDirs && opts.onlyDirs.length > 0 ? new Set(opts.onlyDirs) : undefined;
   const repoFiles = filterByOnlyDirs(walked, root, onlyDirs);
-  const files = listSourceStats(root, outDir, repoFiles);
+  const files = listIndexedStats(root, outDir, repoFiles, onlyDirs);
+  const docPaths = new Set(listDocFiles(root, outDir, repoFiles, onlyDirs).map((f) => relPosix(root, f)));
   const discoveredScopes = discoverScopes(root, repoFiles);
 
   const nodes: NodeV1[] = [];
   const rawEdges: RawEdge[] = [];
+  const markdownRefs: MarkdownRef[] = [];
   const sources = new Map<string, string>();
   /** Display labels, not grammars — `.mjs` is parsed as typescript but reported as
    * javascript, or the banner claims a repo's JavaScript went unindexed. */
@@ -207,12 +210,13 @@ export async function buildGraph(
     opts.onProgress?.({ phase: "parse", index: i, total: files.length, file: rel });
     // Depth tier (hand-written, native grammar) if a language claims the file;
     // otherwise the breadth tier (generic tags.scm over a WASM grammar).
-    const lang = languageOf(f.abs);
+    const isDoc = docPaths.has(rel);
+    const lang = isDoc ? null : languageOf(f.abs);
     // A container is neither tier: its wrapper grammar only locates the embedded
     // block, which then goes to the depth-tier extractor. Checked before the
     // breadth tier so a future grammar claiming .vue can't shadow it.
-    const container = lang ? null : containerLangOf(f.abs);
-    const generic = lang || container ? null : genericLangOf(f.abs);
+    const container = lang || isDoc ? null : containerLangOf(f.abs);
+    const generic = lang || container || isDoc ? null : genericLangOf(f.abs);
     const label = languageLabelOf(f.abs) ?? container?.name ?? generic?.name ?? "unknown";
     const cached = priorExtract.files[rel];
 
@@ -254,19 +258,26 @@ export async function buildGraph(
       }
       nodes.push(...cached.nodes);
       rawEdges.push(...cached.rawEdges);
+      if (isDoc) markdownRefs.push(...extractMarkdown(rel, source).refs);
       langs.add(label);
       return;
     }
 
     parsed++;
     try {
-      const { nodes: fileNodes, rawEdges: fileEdges } = lang
+      const extracted = isDoc
+        ? extractMarkdown(rel, source)
+        : null;
+      const { nodes: fileNodes, rawEdges: fileEdges } = extracted
+        ? { nodes: extracted.nodes, rawEdges: [] as RawEdge[] }
+        : lang
         ? extractFile(rel, source, lang)
         : container
           ? extractContainer(rel, source, container)
           : extractGeneric(rel, source, generic!.name);
       nodes.push(...fileNodes);
       rawEdges.push(...fileEdges);
+      if (extracted) markdownRefs.push(...extracted.refs);
       sources.set(rel, source);
       langs.add(label);
       entries[rel] = { size: f.size, mtimeMs: f.mtimeMs, hash, nodes: fileNodes, rawEdges: fileEdges };
@@ -288,7 +299,7 @@ export async function buildGraph(
     files: entries,
   });
 
-  const edges = resolveEdges(nodes, rawEdges, { goModules: readGoModules(root, repoFiles) });
+  const edges = [...resolveEdges(nodes, rawEdges, { goModules: readGoModules(root, repoFiles) }), ...resolveMarkdownEdges(nodes, markdownRefs)];
 
   // Guard 5 (minimum-substance): node counts aren't known until nodes are
   // assembled, so the merge-tiny-scopes-into-root guard runs here.

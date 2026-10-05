@@ -564,7 +564,7 @@ export function federateGrep(
   root: string,
   override: string | undefined,
   pattern: string,
-  opts: { ignoreCase?: boolean; fixed?: boolean } = {},
+  opts: { ignoreCase?: boolean; fixed?: boolean; docs?: boolean } = {},
 ): { result: GrepResult; coverage: string } {
   const wg = loadWorkspaceGraphs(root, override);
   const groups: GrepGroup[] = [];
@@ -578,6 +578,7 @@ export function federateGrep(
     const r = grepGraph(graph, join(root, child), pattern, {
       ignoreCase: opts.ignoreCase,
       fixed: opts.fixed,
+      docs: opts.docs,
     });
     filesSearched += r.filesSearched;
     totalHits += r.totalHits;

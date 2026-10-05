@@ -355,6 +355,7 @@ program
   .option("-e, --extensions <exts...>", 'code extensions to include (e.g. ".ts" ".py"); an extension with no parser is ignored with a warning that lists the supported set')
   .option("-j, --concurrency <n>", "files summarized in parallel during --deep (default 5)")
   .option("--no-reuse", "re-parse every file instead of replaying unchanged ones from the extraction cache")
+  .option("--no-docs", "exclude Markdown documents from the graph; persisted for future builds and refreshes")
   .option("--lsp", "add compiler-grade call edges via a language server if one is installed (opt-in, slower; e.g. rust-analyzer, clangd)")
   .option("--allow-partial", "with --deep: exit 0 even when some files' summaries failed (default: a degraded meaning tier exits 1)")
   .option(
@@ -389,6 +390,12 @@ program
     (val: string, prev: string[]) => [...prev, val],
     [] as string[],
   )
+  .option(
+    "--docs-dir <path>",
+    "index Markdown under this repo-relative directory; repeatable and persisted for future builds/refreshes",
+    (val: string, prev: string[]) => [...prev, val],
+    [] as string[],
+  )
   .option("--no-gitignore", "skip writing graft/ into .gitignore (same as GRAFT_NO_GITIGNORE=1)")
   .option("--no-ignore", "skip writing .ignore for ripgrep re-admit (same as GRAFT_NO_IGNORE=1)")
   .action(async (
@@ -402,6 +409,8 @@ program
       allowPartial?: boolean;
       includeDir?: string[];
       onlyDir?: string[];
+      docsDir?: string[];
+      docs?: boolean;
       followSubmodules?: boolean;
       followNestedRepos?: boolean;
       gitignore?: boolean;
@@ -422,6 +431,8 @@ program
     // every later no-flag build / hooks refresh) see it identically — the
     // walkDir call sites read it from state, not from a threaded option.
     const buildConfigPatch: BuildConfig = {};
+    const docsWasExplicit = command.getOptionValueSource("docs") === "cli";
+    if (docsWasExplicit) buildConfigPatch.docsEnabled = opts.docs !== false;
     if (opts.includeDir && opts.includeDir.length > 0) {
       // --include-dir takes bare SKIP_DIRS-style directory NAMES (shouldSkipDir
       // compares a single path segment), never paths, and dot-dirs are never
@@ -440,7 +451,17 @@ program
       }
       buildConfigPatch.includeDirs = opts.includeDir;
     }
-    // The whitelist is NOT persisted to `.graft/config.json`: it belongs with the
+    if (opts.docsDir && opts.docsDir.length > 0) {
+      const docsDirs = opts.docsDir.map((p) => normalizePathPrefix(p)).filter((p) => p !== "");
+      if (docsDirs.length !== opts.docsDir.length) {
+        console.error("✗ --docs-dir: expected a non-empty repo-relative path");
+        process.exit(1);
+      }
+      buildConfigPatch.docsDirs = [...new Set(docsDirs)].sort();
+      // Selecting a document scope is itself an explicit request to index docs.
+      buildConfigPatch.docsEnabled = true;
+    }
+    // The whitelist is NOT persisted to `.graft.json`: it belongs with the
     // graph (the fingerprint records it at build time), never in the source repo,
     // so a `--only-dir` build leaves no trace under the repo being indexed.
     let onlyDirs: string[] | undefined;
@@ -503,6 +524,7 @@ program
         childConfig: cliConfig(),
         override: buildGlobalDir,
         includeDirs: opts.includeDir,
+        docsDirs: opts.docsDir,
         followSubmodules: followSubmodulesWasExplicit ? opts.followSubmodules : undefined,
         followNestedRepos: followNestedReposWasExplicit ? opts.followNestedRepos : undefined,
       });
@@ -884,6 +906,7 @@ program
   .argument(...DIR_ARG)
   .option("-i, --ignore-case", "case-insensitive match")
   .option("--fixed", "treat pattern as a literal string, not a regex")
+  .option("--no-docs", "exclude configured Markdown documents from the search")
   .option("--in <path>", "narrow to files at or under this path prefix")
   .option("--json", "output as JSON")
   .option(...NO_REFRESH_FLAG)
@@ -891,14 +914,14 @@ program
     async (
       pattern: string,
       dirArg: string | undefined,
-      opts: { ignoreCase?: boolean; fixed?: boolean; in?: string; json?: boolean; refresh?: boolean },
+      opts: { ignoreCase?: boolean; fixed?: boolean; in?: string; docs?: boolean; json?: boolean; refresh?: boolean },
     ) => {
       const dir = noteQuery(queryRoot(dirArg));
       await refreshBefore(dir, opts);
       const globalOpts = program.opts<{ dir?: string }>();
       if (readWorkspace(dir, globalOpts.dir)) {
         runWorkspaceGrep(dir, globalOpts.dir, pattern, {
-          ignoreCase: opts.ignoreCase, fixed: opts.fixed, json: opts.json,
+          ignoreCase: opts.ignoreCase, fixed: opts.fixed, docs: opts.docs, json: opts.json,
         });
         return;
       }
@@ -907,6 +930,7 @@ program
         ignoreCase: opts.ignoreCase,
         fixed: opts.fixed,
         in: opts.in,
+        docs: opts.docs,
         json: opts.json,
         globalDir: globalOpts.dir,
       });

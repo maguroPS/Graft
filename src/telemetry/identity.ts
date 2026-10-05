@@ -81,9 +81,9 @@ export function installId(home?: string): Install {
 }
 
 /**
- * The repo id, in `graft/.cache/` rather than `.graft/config.json`.
+ * The repo id, in `graft/.cache/` rather than `.graft.json`.
  *
- * `.graft/config.json` would have been the tidier home, but writing it runs
+ * `.graft.json` would have been the tidier home, but writing it runs
  * `ensureBuildConfigIgnored`, which appends to the repo's `.gitignore`. Minting
  * an id during a read-only `graft ask` must not modify a file the user has
  * committed. `graft/.cache/` is already derived, already git-ignored, and

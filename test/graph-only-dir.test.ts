@@ -5,7 +5,7 @@
  * listed repo-relative prefixes are indexed, and everything else (including
  * top-level files) is skipped. It is recorded in the fingerprint — the graph's
  * own freshness sidecar under `graft/` — never in the source repo's
- * `.graft/config.json`, so a limited build leaves no trace under the repo being
+ * `.graft.json`, so a limited build leaves no trace under the repo being
  * indexed. That also keeps the query-path freshness probe honest: the excluded
  * files must not read as phantom "added" drift on every query.
  */

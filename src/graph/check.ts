@@ -24,6 +24,8 @@ import { extractFile, languageOf } from "./extract.js";
 import { extractGeneric, genericLangOf, warmGenericGrammars } from "./generic.js";
 import { containerLangOf, extractContainer, warmContainerGrammars } from "./container.js";
 import { listSourceFiles } from "./build.js";
+import { listDocFiles } from "./source-files.js";
+import { extractMarkdown } from "./markdown.js";
 import { readGraph, wiringPath } from "./write.js";
 import { readFingerprint } from "./fingerprint.js";
 import { readSourceFile } from "../util/source.js";
@@ -87,6 +89,7 @@ export async function checkGraph(
   const fpOnlyDirs = readFingerprint(outDir)?.onlyDirs;
   const onlyDirs = fpOnlyDirs && fpOnlyDirs.length > 0 ? new Set(fpOnlyDirs) : undefined;
   const sourceFiles = listSourceFiles(root, outDir, undefined, onlyDirs);
+  const docFiles = listDocFiles(root, outDir, undefined, onlyDirs);
   await warmGenericGrammars(
     new Set(sourceFiles.map((f) => genericLangOf(f)?.name).filter((n): n is string => !!n)),
   );
@@ -98,14 +101,15 @@ export async function checkGraph(
     new Set(sourceFiles.map((f) => containerLangOf(f)?.name).filter((n): n is string => !!n)),
   );
   const current = new Map<string, string>(); // id → body_hash
-  for (const file of sourceFiles) {
+  for (const file of [...sourceFiles, ...docFiles]) {
     // The same three-way branch `buildGraph` uses, in the same order. The two must
     // stay in step: a tier the build extracts and the check cannot see reports as
     // `removed` forever, and the `graft build` the check tells you to run can never
     // repair it.
-    const lang = languageOf(file);
-    const container = lang ? null : containerLangOf(file);
-    const generic = lang || container ? null : genericLangOf(file);
+    const isDoc = docFiles.includes(file);
+    const lang = isDoc ? null : languageOf(file);
+    const container = lang || isDoc ? null : containerLangOf(file);
+    const generic = lang || container || isDoc ? null : genericLangOf(file);
     let source: string | null;
     try {
       source = readSourceFile(file);
@@ -115,7 +119,9 @@ export async function checkGraph(
     if (source === null) continue; // unsupported encoding (e.g. UTF-16BE)
     const rel = relPosix(root, file);
     try {
-      const extracted = lang
+      const extracted = isDoc
+        ? { nodes: extractMarkdown(rel, source).nodes }
+        : lang
         ? extractFile(rel, source, lang)
         : container
           ? extractContainer(rel, source, container)
