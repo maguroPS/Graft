@@ -299,10 +299,10 @@ function matchedStrongTerms(
 
 // ── Structural intent ──────────────────────────────────────────────────────
 
-const INCOMING = /\b(caller|callers|calls?\s+into|who\s+calls|what\s+calls|called\s+by|used\s+by|uses)\b/;
-const OUTGOING = /\b(callee|callees|what\s+does\s+\w+\s+call|calls\s+what|imports?|depends\s+on)\b/;
-const INCOMING_RELS: Relation[] = ["calls", "references", "implements", "extends"];
-const OUTGOING_RELS: Relation[] = ["calls", "references", "imports", "implements", "extends"];
+const INCOMING = /\b(caller|callers|calls?\s+into|who\s+calls|what\s+calls|called\s+by|used\s+by|uses|linked\s+by|links?\s+to)\b/;
+const OUTGOING = /\b(callee|callees|what\s+does\s+\w+\s+call|calls\s+what|imports?|depends\s+on|what\s+does\s+\w+\s+link|references?)\b/;
+const INCOMING_RELS: Relation[] = ["calls", "references", "implements", "extends", "links_to"];
+const OUTGOING_RELS: Relation[] = ["calls", "references", "imports", "implements", "extends", "links_to"];
 
 /** Split a prose query into word-like tokens, keeping dots so a qualified name
  * ("Cache.get") or package-qualified name ("pkg.Fn") survives as one token —

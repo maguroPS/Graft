@@ -7,7 +7,7 @@
  * token identifying the brain, and the rules cached beside it so `ask` never
  * waits on the network.
  *
- * The link lives in the per-repo, git-ignored `.graft/config.json`, next to the
+ * The link lives in the per-repo, git-ignored `.graft.json`, next to the
  * other persisted build choices. Not in `~/.graft/`: a brain belongs to one
  * repository, and two checkouts of different repos on one machine must not
  * share one.

@@ -10,7 +10,7 @@ import { statSync } from "node:fs";
 import { resolve } from "node:path";
 import { walkDir } from "../ingest/fs.js";
 import { relPosix } from "../util/paths.js";
-import { readFollowNestedRepos, readFollowSubmodules, readIncludeDirs } from "../util/state.js";
+import { readDocsDirs, readDocsEnabled, readFollowNestedRepos, readFollowSubmodules, readIncludeDirs } from "../util/state.js";
 import { languageOf, depthExtensions } from "./extract.js";
 import { genericLangOf, genericExtensions } from "./generic.js";
 import { containerLangOf, containerExtensions } from "./container.js";
@@ -84,6 +84,30 @@ export function listSourceFiles(
   );
 }
 
+/** Markdown documents are indexed by default. `--docs-dir` narrows the corpus;
+ * `--no-docs` disables it for repos that need a code-only graph. */
+export function listDocFiles(
+  root: string,
+  outDir: string,
+  repoFiles: string[] = walkDir(root, readIncludeDirs(resolve(root)), {
+    followSubmodules: readFollowSubmodules(resolve(root)),
+    followNestedRepos: readFollowNestedRepos(resolve(root)),
+  }),
+  onlyDirs?: ReadonlySet<string>,
+): string[] {
+  const docs = readDocsDirs(resolve(root));
+  if (!readDocsEnabled(resolve(root))) return [];
+  return filterByOnlyDirs(
+    repoFiles.filter((f) => {
+      if (f.startsWith(outDir) || !f.toLowerCase().endsWith(".md")) return false;
+      const rel = relPosix(root, f);
+      return !docs?.size || [...docs].some((d) => rel === d || rel.startsWith(`${d}/`));
+    }),
+    root,
+    onlyDirs,
+  );
+}
+
 export interface SourceStat {
   /** Absolute path. */
   abs: string;
@@ -115,6 +139,18 @@ export function listSourceStats(
       continue;
     }
     out.push({ abs, rel: relPosix(root, abs), size: s.size, mtimeMs: s.mtimeMs });
+  }
+  return out;
+}
+
+/** All indexed inputs: code plus configured Markdown. */
+export function listIndexedStats(
+  root: string, outDir: string, repoFiles?: string[], onlyDirs?: ReadonlySet<string>,
+): SourceStat[] {
+  const files = [...listSourceFiles(root, outDir, repoFiles, onlyDirs), ...listDocFiles(root, outDir, repoFiles, onlyDirs)];
+  const out: SourceStat[] = [];
+  for (const abs of files) {
+    try { const s = statSync(abs); out.push({ abs, rel: relPosix(root, abs), size: s.size, mtimeMs: s.mtimeMs }); } catch { /* vanished */ }
   }
   return out;
 }

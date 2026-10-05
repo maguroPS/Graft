@@ -87,6 +87,11 @@ export function writeStats(d: string, s: Stats): void { writeJsonAtomic(statsPat
  * Missing fields always retain backwards-compatible defaults.
  */
 export interface BuildConfig {
+  /** Optional repo-relative Markdown directories that narrow the documentation
+   * corpus. Absent indexes Markdown anywhere in the repository. */
+  docsDirs?: string[];
+  /** Markdown is indexed by default; false is the persisted --no-docs opt-out. */
+  docsEnabled?: boolean;
   /** SKIP_DIRS names to include in this repo's walks, persisted so a LATER
    * no-flag build — and the fingerprint/refresh path, which never sees CLI
    * flags at all — behave identically to the invocation that set it. */
@@ -103,7 +108,7 @@ export interface BuildConfig {
    * boundary. */
   followNestedRepos?: boolean;
   /** The Trail brain this repo's rules come from: the brain id and the token to
-   * read it with. Persisted here — in the git-ignored `.graft/` — rather than in
+   * read it with. Persisted here — in git-ignored `.graft.json` — rather than in
    * `~/.graft/`, because a brain belongs to one repository and two checkouts on
    * one machine must not share one. `undefined` clears it. */
   brain?: { brainId: string; token: string; baseUrl?: string };
@@ -112,9 +117,10 @@ export interface BuildConfig {
 /** Local, Git-ignored repository configuration. Kept outside generated
  * `graft/` output so deleting/replacing that cache, workspace federation, and
  * custom `--dir` builds cannot erase or redirect the persisted choice. */
-export const BUILD_CONFIG_DIR = '.graft';
+export const BUILD_CONFIG_FILE = '.graft.json';
 
-export function buildConfigPath(d: string): string { return join(d, BUILD_CONFIG_DIR, 'config.json'); }
+export function buildConfigPath(d: string): string { return join(d, BUILD_CONFIG_FILE); }
+function legacyBuildConfigPath(d: string): string { return join(d, '.graft', 'config.json'); }
 
 /** Keep local build configuration out of Git without coupling it to the
  * generated graph directory. Best-effort, matching graph-cache ignore setup. */
@@ -124,15 +130,19 @@ function ensureBuildConfigIgnored(d: string): void {
   try { current = readFileSync(path, 'utf8'); } catch { /* no .gitignore yet */ }
   const present = current.split('\n').some((line) => {
     const value = line.trim();
-    return value === BUILD_CONFIG_DIR || value === `${BUILD_CONFIG_DIR}/` || value === `/${BUILD_CONFIG_DIR}/`;
+    return value === BUILD_CONFIG_FILE || value === `/${BUILD_CONFIG_FILE}`;
   });
   if (present) return;
   const gap = current === '' ? '' : current.endsWith('\n') ? '\n' : '\n\n';
-  const block = `${gap}# graft's local repository settings — not committed.\n/${BUILD_CONFIG_DIR}/\n`;
+  const block = `${gap}# graft's local repository settings — not committed.\n/${BUILD_CONFIG_FILE}\n`;
   try { writeFileSync(path, current + block); } catch { /* best-effort */ }
 }
 
-export function readBuildConfig(d: string): BuildConfig | null { return readJson<BuildConfig>(buildConfigPath(d)); }
+/** Prefer the root config, but keep existing local settings effective after an
+ * upgrade until the next write naturally moves them to `.graft.json`. */
+export function readBuildConfig(d: string): BuildConfig | null {
+  return readJson<BuildConfig>(buildConfigPath(d)) ?? readJson<BuildConfig>(legacyBuildConfigPath(d));
+}
 export function writeBuildConfig(d: string, c: BuildConfig): void {
   ensureBuildConfigIgnored(d);
   writeJsonAtomic(buildConfigPath(d), c);
@@ -152,6 +162,16 @@ export function patchBuildConfig(d: string, patch: BuildConfig): void {
 export function readIncludeDirs(d: string): Set<string> | undefined {
   const dirs = readBuildConfig(d)?.includeDirs;
   return dirs && dirs.length ? new Set(dirs) : undefined;
+}
+
+export function readDocsDirs(d: string): Set<string> | undefined {
+  const dirs = readBuildConfig(d)?.docsDirs;
+  return dirs && dirs.length ? new Set(dirs) : undefined;
+}
+
+/** Markdown is part of a normal build unless a repo explicitly opted out. */
+export function readDocsEnabled(d: string): boolean {
+  return readBuildConfig(d)?.docsEnabled !== false;
 }
 
 /** Missing and explicit false both retain the backwards-compatible default. */

@@ -17,6 +17,7 @@ export interface GrepCliOptions {
   ignoreCase?: boolean;
   fixed?: boolean;
   in?: string;
+  docs?: boolean;
   json?: boolean;
   /** the top-level `--dir` override, so this command respects it like every other. */
   globalDir?: string;
@@ -71,7 +72,7 @@ export function formatGrepResult(result: GrepResult): string {
  * otherwise a zero-hit result on a stale graph or wrong root reads as "no
  * matches" when really some files were never searched at all. */
 export function zeroHitNote(result: GrepResult): string {
-  const base = `no hits for "${result.pattern}" in ${result.filesSearched} indexed files. The pattern may be too specific — retry graft grep with a bare symbol name or short substring (drop the receiver, full signature, and regex anchors). All indexed code was searched; use raw grep -rn only for genuinely unindexed files (docs, configs, brand-new files)`;
+  const base = `no hits for "${result.pattern}" in ${result.filesSearched} indexed files. The pattern may be too specific — retry graft grep with a bare symbol name or short substring (drop the receiver, full signature, and regex anchors). All indexed files were searched; use raw grep -rn only for genuinely unindexed files (configs, brand-new files)`;
   const { files } = result.truncated;
   if (files === 0) return base;
   return `${base} — note: ${files} indexed file${files === 1 ? "" : "s"} could not be read (stale graph? run graft build)`;
@@ -95,7 +96,7 @@ export function runGrepCommand(pattern: string, dir: string, opts: GrepCliOption
 
   let result: GrepResult;
   try {
-    result = grepGraph(graph, root, pattern, { ignoreCase: opts.ignoreCase, fixed: opts.fixed, in: opts.in });
+    result = grepGraph(graph, root, pattern, { ignoreCase: opts.ignoreCase, fixed: opts.fixed, in: opts.in, docs: opts.docs });
   } catch (err) {
     // `new RegExp` throws SyntaxError; anything else (an unindexed `--in` prefix)
     // is a different mistake and must not be reported as a bad pattern.

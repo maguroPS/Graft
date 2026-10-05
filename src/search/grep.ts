@@ -70,6 +70,9 @@ export interface GrepOptions {
   /** Narrow to file nodes at or under this repo-relative path prefix — the same
    * segment-aware rule `ask --in` and `callers --in` use. Either separator. */
   in?: string;
+  /** Include configured Markdown documents. Defaults to true; set false to
+   * search code only. */
+  docs?: boolean;
   /** Stop collecting hits after this many; the rest are tallied into
    * `truncated.hits`. Default 300. */
   maxHits?: number;
@@ -149,7 +152,7 @@ export function grepGraph(graph: GraphV1, repoRoot: string, pattern: string, opt
   const inPrefix = opts.in ? normalizePathPrefix(opts.in) : undefined;
   if (inPrefix) assertPrefixIndexed(graph, inPrefix);
   const fileNodes = graph.nodes.filter(
-    (n) => n.kind === "file" && (inPrefix === undefined || pathUnderPrefix(n.path, inPrefix)),
+    (n) => (n.kind === "file" || (opts.docs !== false && n.kind === "document")) && (inPrefix === undefined || pathUnderPrefix(n.path, inPrefix)),
   );
 
   const groups = new Map<string, GrepGroup>();
